@@ -51,48 +51,45 @@ def pdf_to_word(input_path, output_path):
     cv.close()
 
 
-def word_to_pdf_libreoffice(input_path, output_dir):
-    """Convert Word to PDF using LibreOffice (cross-platform)."""
-    import subprocess
-    subprocess.run(
-        ["libreoffice", "--headless", "--convert-to", "pdf", "--outdir", output_dir, input_path],
-        check=True, capture_output=True, timeout=120
-    )
-    base = os.path.splitext(os.path.basename(input_path))[0]
-    return os.path.join(output_dir, f"{base}.pdf")
-
-
-def word_to_pdf_win32(input_path, output_path):
-    """Convert Word to PDF using Microsoft Word COM (Windows only)."""
-    import pythoncom
-    pythoncom.CoInitialize()
-    try:
-        from win32com import client
-        word = client.Dispatch("Word.Application")
-        word.Visible = False
-        try:
-            doc = word.Documents.Open(input_path)
-            doc.ExportAsFixedFormat(output_path, 17)  # 17 = wdFormatPDF
-            doc.Close()
-        finally:
-            word.Quit()
-    finally:
-        pythoncom.CoUninitialize()
-
-
 def word_to_pdf(input_path, output_path):
-    """Try win32com first (Windows), fall back to LibreOffice."""
+    """Try win32com (Windows), then LibreOffice, then report unavailable."""
+    # 1. Microsoft Word (Windows)
     try:
-        word_to_pdf_win32(input_path, output_path)
+        import pythoncom
+        pythoncom.CoInitialize()
+        try:
+            from win32com import client
+            word = client.Dispatch("Word.Application")
+            word.Visible = False
+            try:
+                doc = word.Documents.Open(input_path)
+                doc.ExportAsFixedFormat(output_path, 17)
+                doc.Close()
+                return
+            finally:
+                word.Quit()
+        finally:
+            pythoncom.CoUninitialize()
+    except Exception:
+        pass
+
+    # 2. LibreOffice (Linux with LO installed)
+    try:
+        import subprocess
+        output_dir = os.path.dirname(output_path)
+        subprocess.run(
+            ["libreoffice", "--headless", "--convert-to", "pdf", "--outdir", output_dir, input_path],
+            check=True, capture_output=True, timeout=120
+        )
+        base = os.path.splitext(os.path.basename(input_path))[0]
+        generated = os.path.join(output_dir, f"{base}.pdf")
+        if generated != output_path:
+            os.rename(generated, output_path)
         return
     except Exception:
         pass
-    output_dir = os.path.dirname(output_path)
-    result = word_to_pdf_libreoffice(input_path, output_dir)
-    base = os.path.splitext(os.path.basename(input_path))[0]
-    generated = os.path.join(output_dir, f"{base}.pdf")
-    if generated != output_path:
-        os.rename(generated, output_path)
+
+    raise RuntimeError("Word转PDF不可用：未检测到Microsoft Word或LibreOffice")
 
 
 def process_job(job_id, filename, direction):
