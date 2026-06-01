@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>PDF ⇄ Word 转换</title>
+<style>
+  :root {
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --success: #10b981;
+    --danger: #ef4444;
+    --bg: #f5f3ff;
+    --surface: #fff;
+    --text: #1e293b;
+    --text-muted: #94a3b8;
+    --border: #e2e8f0;
+    --radius: 16px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(160deg, #eef2ff 0%, #e0e7ff 40%, #f5f3ff 100%);
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .container {
+    background: var(--surface);
+    border-radius: 24px;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 20px 50px -12px rgba(99,102,241,0.15);
+    padding: clamp(24px, 5vw, 44px);
+    max-width: 500px;
+    width: 100%;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+
+  .logo {
+    width: 56px; height: 56px;
+    background: linear-gradient(135deg, var(--primary), #8b5cf6);
+    border-radius: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    margin-bottom: 12px;
+    box-shadow: 0 8px 24px rgba(99,102,241,0.25);
+  }
+
+  h1 {
+    font-size: clamp(20px, 4vw, 26px);
+    color: var(--text);
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 13px;
+    margin-top: 4px;
+  }
+
+  /* Mode switch */
+  .mode-switch {
+    display: flex;
+    background: #f1f5f9;
+    border-radius: 14px;
+    padding: 4px;
+    margin-bottom: 24px;
+    gap: 4px;
+  }
+
+  .mode-btn {
+    flex: 1;
+    padding: 12px 8px;
+    border: none;
+    background: transparent;
+    border-radius: 11px;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-muted);
+    transition: all 0.25s;
+    white-space: nowrap;
+  }
+
+  .mode-btn.active {
+    background: #fff;
+    color: var(--primary);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+
+  /* Upload zone */
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 44px 16px;
+    text-align: center;
+    transition: all 0.25s;
+    cursor: pointer;
+    position: relative;
+    background: #fafbff;
+  }
+
+  .drop-zone:active { transform: scale(0.99); }
+
+  .drop-zone.has-file {
+    border-color: var(--primary);
+    border-style: solid;
+    background: #f8f7ff;
+    padding: 24px 16px;
+  }
+
+  .upload-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+    display: block;
+  }
+
+  .drop-zone h3 {
+    font-size: 16px;
+    color: var(--text);
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+
+  .drop-zone p {
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+
+  .file-info {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .drop-zone.has-file .file-info { display: flex; }
+  .drop-zone.has-file .upload-prompt { display: none; }
+
+  .file-icon { font-size: 36px; }
+  .file-name {
+    font-weight: 600;
+    color: var(--text);
+    font-size: 14px;
+    word-break: break-all;
+    max-width: 220px;
+  }
+  .file-size { color: var(--text-muted); font-size: 12px; }
+  .remove-file {
+    background: #fee2e2;
+    border: none;
+    color: var(--danger);
+    min-width: 34px; height: 34px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  /* Button */
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 16px;
+    border: none;
+    border-radius: 14px;
+    font-size: 17px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 20px;
+    -webkit-appearance: none;
+  }
+
+  .btn:active { transform: scale(0.98); }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--primary), #7c3aed);
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(99,102,241,0.3);
+  }
+  .btn-primary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  /* Progress */
+  .progress-section { display: none; margin-top: 20px; }
+  .progress-bar-bg {
+    background: #e2e8f0; border-radius: 8px; height: 6px; overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%; border-radius: 8px;
+    background: linear-gradient(90deg, var(--primary), #8b5cf6);
+    width: 0%; transition: width 0.5s ease;
+  }
+  .progress-text {
+    text-align: center; color: var(--text-muted); font-size: 13px; margin-top: 8px;
+  }
+
+  /* Result */
+  .result-section { display: none; margin-top: 24px; text-align: center; }
+
+  .result-success, .result-error { padding: 16px 0; }
+  .result-success .result-icon, .result-error .result-icon { font-size: 44px; margin-bottom: 6px; }
+  .result-success p:first-of-type { color: var(--success); font-weight: 700; font-size: 16px; }
+  .result-error p { color: var(--danger); font-weight: 600; font-size: 15px; }
+
+  .btn-download {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 14px 36px;
+    background: var(--success);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: none;
+    box-shadow: 0 4px 14px rgba(16,185,129,0.3);
+  }
+  .btn-download:active { transform: scale(0.96); }
+
+  input[type="file"] { display: none; }
+
+  /* Tips */
+  .tips {
+    margin-top: 24px;
+    padding: 14px 16px;
+    background: #f8fafc;
+    border-radius: 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.9;
+  }
+  .tips strong { color: var(--text); }
+
+  /* Mobile badge */
+  .network-badge {
+    display: block;
+    text-align: center;
+    margin-top: 16px;
+    padding: 8px 14px;
+    background: #ecfdf5;
+    border-radius: 10px;
+    font-size: 12px;
+    color: #065f46;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="logo">📄</div>
+    <h1>PDF ⇄ Word 转换</h1>
+    <p class="subtitle">文件格式互转 · 免费 · 隐私安全</p>
+  </div>
+
+  <div class="mode-switch">
+    <button class="mode-btn active" data-direction="pdf2word" onclick="switchMode('pdf2word')">PDF → Word</button>
+    <button class="mode-btn" data-direction="word2pdf" onclick="switchMode('word2pdf')">Word → PDF</button>
+  </div>
+
+  <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <div class="upload-prompt">
+      <span class="upload-icon">📤</span>
+      <h3>点击选择文件</h3>
+      <p id="fileHint">支持 .pdf 文件</p>
+    </div>
+    <div class="file-info">
+      <span class="file-icon">📎</span>
+      <div>
+        <div class="file-name" id="fileName"></div>
+        <div class="file-size" id="fileSize"></div>
+      </div>
+      <button class="remove-file" onclick="removeFile(event)">✕</button>
+    </div>
+  </div>
+  <input type="file" id="fileInput" accept=".pdf,.docx,.doc" onchange="handleFileSelect(event)">
+
+  <button class="btn btn-primary" id="convertBtn" disabled onclick="startConvert()">
+    开始转换
+  </button>
+
+  <div class="progress-section" id="progressSection">
+    <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar"></div></div>
+    <p class="progress-text" id="progressText">正在上传...</p>
+  </div>
+
+  <div class="result-section" id="resultSection"></div>
+
+  <div class="tips">
+    <strong>使用说明</strong><br>
+    PDF → Word：上传 PDF 转为可编辑 .docx<br>
+    Word → PDF：上传 .docx/.doc 转为 PDF<br>
+    手机和电脑浏览器均可使用
+  </div>
+
+  <div class="network-badge" id="networkBadge"></div>
+</div>
+
+<script>
+  let currentMode = "pdf2word";
+  let selectedFile = null;
+
+  // Show network info
+  fetch('/api/network-info')
+    .then(r => r.json())
+    .then(d => {
+      if (d.local_ip && d.local_ip !== '127.0.0.1') {
+        document.getElementById('networkBadge').innerHTML =
+          '<span style="font-size:13px;">📱 手机访问：</span><br><strong>http://' + d.local_ip + ':5000</strong>';
+      }
+    })
+    .catch(() => {});
+
+  function switchMode(mode) {
+    currentMode = mode;
+    document.querySelectorAll(".mode-btn").forEach(b => {
+      b.classList.toggle("active", b.dataset.direction === mode);
+    });
+    document.getElementById("fileHint").innerText =
+      mode === "pdf2word" ? "支持 .pdf 文件" : "支持 .docx / .doc 文件";
+    document.getElementById("fileInput").accept =
+      mode === "pdf2word" ? ".pdf" : ".docx,.doc";
+    resetUI();
+  }
+
+  const dropZone = document.getElementById("dropZone");
+  dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropZone.classList.remove("drag-over");
+    if (e.dataTransfer.files.length) validateAndSetFile(e.dataTransfer.files[0]);
+  });
+
+  function handleFileSelect(e) {
+    if (e.target.files.length) validateAndSetFile(e.target.files[0]);
+    // Reset input so re-selecting same file triggers change
+    e.target.value = "";
+  }
+
+  function validateAndSetFile(file) {
+    const validExts = currentMode === "pdf2word" ? ["pdf"] : ["docx", "doc"];
+    const ext = file.name.split(".").pop().toLowerCase();
+    if (!validExts.includes(ext)) {
+      const expect = currentMode === "pdf2word" ? "PDF" : "DOCX/DOC";
+      showToast("请上传 " + expect + " 格式的文件");
+      return;
+    }
+    selectedFile = file;
+    document.getElementById("fileName").textContent = file.name;
+    document.getElementById("fileSize").textContent = formatSize(file.size);
+    dropZone.classList.add("has-file");
+    document.getElementById("convertBtn").disabled = false;
+    document.getElementById("resultSection").style.display = "none";
+  }
+
+  function removeFile(e) {
+    e.stopPropagation();
+    selectedFile = null;
+    dropZone.classList.remove("has-file");
+    document.getElementById("convertBtn").disabled = true;
+    document.getElementById("resultSection").style.display = "none";
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  }
+
+  function resetUI() {
+    selectedFile = null;
+    dropZone.classList.remove("has-file");
+    document.getElementById("convertBtn").disabled = true;
+    document.getElementById("progressSection").style.display = "none";
+    document.getElementById("resultSection").style.display = "none";
+  }
+
+  function showToast(msg) {
+    const el = document.createElement("div");
+    el.style.cssText = "position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:12px 24px;border-radius:10px;font-size:14px;z-index:999;font-weight:600;box-shadow:0 8px 30px rgba(0,0,0,0.2);animation:fadeIn 0.3s";
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => { el.style.opacity = "0"; el.style.transition = "opacity 0.3s"; }, 2000);
+    setTimeout(() => el.remove(), 2400);
+  }
+
+  async function startConvert() {
+    if (!selectedFile) return;
+
+    document.getElementById("convertBtn").disabled = true;
+    document.getElementById("progressSection").style.display = "block";
+    document.getElementById("progressBar").style.width = "10%";
+    document.getElementById("progressText").textContent = "上传中...";
+    document.getElementById("resultSection").style.display = "none";
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+    formData.append("direction", currentMode);
+
+    try {
+      const uploadRes = await fetch("/upload", { method: "POST", body: formData });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) { showError(uploadData.error); return; }
+
+      document.getElementById("progressBar").style.width = "30%";
+      document.getElementById("progressText").textContent = "正在转换...";
+
+      let width = 30;
+      const poll = setInterval(async () => {
+        try {
+          const statusRes = await fetch("/status/" + uploadData.job_id);
+          const statusData = await statusRes.json();
+
+          if (statusData.status === "done") {
+            clearInterval(poll);
+            document.getElementById("progressBar").style.width = "100%";
+            document.getElementById("progressText").textContent = "完成";
+            setTimeout(() => {
+              document.getElementById("progressSection").style.display = "none";
+              showResult(uploadData.job_id, uploadData.filename);
+            }, 400);
+          } else if (statusData.status === "error") {
+            clearInterval(poll);
+            showError(statusData.error || "转换失败");
+          } else {
+            width = Math.min(width + 4, 88);
+            document.getElementById("progressBar").style.width = width + "%";
+          }
+        } catch {
+          clearInterval(poll);
+          showError("网络错误，请重试");
+        }
+      }, 900);
+    } catch (err) {
+      showError("上传失败: " + err.message);
+    }
+  }
+
+  function showError(msg) {
+    document.getElementById("progressSection").style.display = "none";
+    document.getElementById("convertBtn").disabled = false;
+    const section = document.getElementById("resultSection");
+    section.style.display = "block";
+    section.innerHTML =
+      '<div class="result-error"><div class="result-icon">⚠️</div><p>' + msg + '</p></div>';
+  }
+
+  function showResult(jobId, filename) {
+    const section = document.getElementById("resultSection");
+    section.style.display = "block";
+    const ext = currentMode === "pdf2word" ? ".docx" : ".pdf";
+    const outName = filename.replace(/\.\w+$/, ext);
+    section.innerHTML =
+      '<div class="result-success">' +
+      '<div class="result-icon">✅</div>' +
+      '<p>转换成功</p>' +
+      '<p style="color:#94a3b8;font-size:13px;margin-top:4px;">' + filename + ' → ' + outName + '</p>' +
+      '<a class="btn-download" href="/download/' + jobId + '" download>下载文件</a>' +
+      '</div>';
+    document.getElementById("convertBtn").disabled = false;
+  }
+</script>
+</body>
+</html>
