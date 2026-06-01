@@ -15,6 +15,8 @@ COPY . .
 
 RUN mkdir -p uploads downloads
 
-EXPOSE 5000
+EXPOSE 7860
 
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120"]
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+CMD ["/entrypoint.sh"]
