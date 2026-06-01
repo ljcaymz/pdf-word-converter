@@ -163,7 +163,9 @@ def upload():
         return jsonify({"error": "Word 转 PDF 需要上传 .docx 或 .doc 文件"}), 400
 
     job_id = str(uuid.uuid4())
-    filename = secure_filename(file.filename)
+    # Preserve original extension in case secure_filename strips non-ASCII
+    safe_base = secure_filename(file.filename.rsplit(".", 1)[0]) or job_id
+    filename = f"{safe_base}.{ext}"
     input_path = os.path.join(app.config["UPLOAD_FOLDER"], f"{job_id}_{filename}")
     file.save(input_path)
 
