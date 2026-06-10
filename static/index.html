@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>PDF ⇄ Word 转换</title>
+<style>
+  :root {
+    --primary: #6366f1;
+    --surface: #fff;
+    --text: #1e293b;
+    --text-muted: #94a3b8;
+    --border: #e2e8f0;
+    --radius: 16px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(160deg, #eef2ff 0%, #e0e7ff 40%, #f5f3ff 100%);
+    min-height: 100dvh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .container {
+    background: var(--surface);
+    border-radius: 24px;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 20px 50px -12px rgba(99,102,241,0.15);
+    padding: clamp(24px, 5vw, 44px);
+    max-width: 500px; width: 100%;
+  }
+  .header { text-align: center; margin-bottom: 24px; }
+  .logo {
+    width: 56px; height: 56px;
+    background: linear-gradient(135deg, var(--primary), #8b5cf6);
+    border-radius: 16px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 28px; margin-bottom: 12px;
+    box-shadow: 0 8px 24px rgba(99,102,241,0.25);
+  }
+  h1 { font-size: clamp(20px, 4vw, 26px); color: var(--text); font-weight: 700; }
+  .subtitle { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+  .mode-switch {
+    display: flex; background: #f1f5f9; border-radius: 14px; padding: 4px;
+    margin-bottom: 24px; gap: 4px;
+  }
+  .mode-btn {
+    flex: 1; padding: 12px 8px; border: none; background: transparent;
+    border-radius: 11px; cursor: pointer; font-size: 14px; font-weight: 600;
+    color: var(--text-muted); transition: all 0.25s; white-space: nowrap;
+  }
+  .mode-btn.active { background: #fff; color: var(--primary); box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .drop-zone {
+    border: 2px dashed var(--border); border-radius: var(--radius);
+    padding: 40px 16px; text-align: center; cursor: pointer;
+    background: #fafbff; transition: all 0.25s;
+  }
+  .drop-zone:active { transform: scale(0.99); }
+  .drop-zone.has-file { border-color: var(--primary); border-style: solid; background: #f8f7ff; padding: 20px 16px; }
+  .upload-icon { font-size: 44px; margin-bottom: 10px; display: block; }
+  .drop-zone h3 { font-size: 15px; color: var(--text); margin-bottom: 4px; font-weight: 600; }
+  .drop-zone p { color: var(--text-muted); font-size: 13px; }
+  .file-info { display: none; align-items: center; justify-content: center; gap: 10px; }
+  .drop-zone.has-file .file-info { display: flex; }
+  .drop-zone.has-file .upload-prompt { display: none; }
+  .file-icon { font-size: 32px; }
+  .file-name { font-weight: 600; color: var(--text); font-size: 13px; word-break: break-all; max-width: 200px; }
+  .file-size { color: var(--text-muted); font-size: 12px; }
+  .remove-file {
+    background: #fee2e2; border: none; color: #ef4444;
+    min-width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
+    font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .btn {
+    display: block; width: 100%; padding: 15px; border: none; border-radius: 14px;
+    font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s; margin-top: 18px;
+    -webkit-appearance: none;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--primary), #7c3aed);
+    color: #fff; box-shadow: 0 4px 16px rgba(99,102,241,0.3);
+  }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+  .progress-section { display: none; margin-top: 18px; }
+  .progress-bar-bg { background: #e2e8f0; border-radius: 8px; height: 6px; overflow: hidden; }
+  .progress-bar-fill {
+    height: 100%; border-radius: 8px;
+    background: linear-gradient(90deg, var(--primary), #8b5cf6);
+    width: 0%; transition: width 0.3s;
+  }
+  .progress-text { text-align: center; color: var(--text-muted); font-size: 12px; margin-top: 8px; }
+  .result-section { display: none; margin-top: 20px; text-align: center; }
+  .result-success .result-icon, .result-error .result-icon { font-size: 40px; margin-bottom: 6px; }
+  .result-success p:first-of-type { color: #10b981; font-weight: 700; font-size: 16px; }
+  .result-error p { color: #ef4444; font-weight: 600; font-size: 14px; }
+  .btn-download {
+    display: inline-block; margin-top: 10px; padding: 12px 32px;
+    background: #10b981; color: #fff; border: none; border-radius: 12px;
+    font-size: 15px; font-weight: 700; cursor: pointer; text-decoration: none;
+    box-shadow: 0 4px 14px rgba(16,185,129,0.3);
+  }
+  .btn-download:active { transform: scale(0.96); }
+  input[type="file"] { display: none; }
+  .tips {
+    margin-top: 20px; padding: 12px 14px; background: #f8fafc;
+    border-radius: 12px; font-size: 11px; color: var(--text-muted); line-height: 1.8;
+  }
+  .tips strong { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="logo">📄</div>
+    <h1>PDF ⇄ Word 转换</h1>
+    <p class="subtitle">浏览器本地处理 · 无需上传服务器</p>
+  </div>
+
+  <div class="mode-switch">
+    <button class="mode-btn active" data-direction="pdf2word" onclick="switchMode('pdf2word')">PDF → Word</button>
+    <button class="mode-btn" data-direction="word2pdf" onclick="switchMode('word2pdf')">Word → PDF</button>
+  </div>
+
+  <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <div class="upload-prompt">
+      <span class="upload-icon">📤</span>
+      <h3>点击选择文件</h3>
+      <p id="fileHint">支持 .pdf 文件</p>
+    </div>
+    <div class="file-info">
+      <span class="file-icon">📎</span>
+      <div>
+        <div class="file-name" id="fileName"></div>
+        <div class="file-size" id="fileSize"></div>
+      </div>
+      <button class="remove-file" onclick="removeFile(event)">✕</button>
+    </div>
+  </div>
+  <input type="file" id="fileInput" accept=".pdf,.docx,.doc" onchange="handleFileSelect(event)">
+
+  <button class="btn btn-primary" id="convertBtn" disabled onclick="startConvert()">开始转换</button>
+
+  <div class="progress-section" id="progressSection">
+    <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressBar"></div></div>
+    <p class="progress-text" id="progressText"></p>
+  </div>
+
+  <div class="result-section" id="resultSection"></div>
+
+  <div class="tips">
+    <strong>使用说明</strong><br>
+    PDF → Word：提取 PDF 文本和图片生成 .docx<br>
+    Word → PDF：将 .docx 文档转为 PDF<br>
+    所有处理在浏览器本地完成，不上传文件
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs" type="module"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+<script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+
+<script type="module">
+import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
+
+let currentMode = "pdf2word";
+let selectedFile = null;
+
+window.switchMode = function(mode) {
+  currentMode = mode;
+  document.querySelectorAll(".mode-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.direction === mode);
+  });
+  document.getElementById("fileHint").innerText = mode === "pdf2word" ? "支持 .pdf 文件" : "支持 .docx / .doc 文件";
+  document.getElementById("fileInput").accept = mode === "pdf2word" ? ".pdf" : ".docx,.doc";
+  resetUI();
+};
+
+const dropZone = document.getElementById("dropZone");
+dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+dropZone.addEventListener("drop", e => {
+  e.preventDefault();
+  dropZone.classList.remove("drag-over");
+  if (e.dataTransfer.files.length) validateAndSetFile(e.dataTransfer.files[0]);
+});
+
+window.handleFileSelect = function(e) {
+  if (e.target.files.length) validateAndSetFile(e.target.files[0]);
+};
+
+function validateAndSetFile(file) {
+  const validExts = currentMode === "pdf2word" ? ["pdf"] : ["docx", "doc"];
+  const ext = file.name.split(".").pop().toLowerCase();
+  if (!validExts.includes(ext)) {
+    alert("请上传 " + (currentMode === "pdf2word" ? "PDF" : "DOCX/DOC") + " 格式");
+    return;
+  }
+  selectedFile = file;
+  document.getElementById("fileName").textContent = file.name;
+  document.getElementById("fileSize").textContent = formatSize(file.size);
+  dropZone.classList.add("has-file");
+  document.getElementById("convertBtn").disabled = false;
+  document.getElementById("resultSection").style.display = "none";
+}
+
+window.removeFile = function(e) {
+  e.stopPropagation();
+  selectedFile = null;
+  dropZone.classList.remove("has-file");
+  document.getElementById("convertBtn").disabled = true;
+  document.getElementById("resultSection").style.display = "none";
+};
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+}
+
+function resetUI() {
+  selectedFile = null;
+  dropZone.classList.remove("has-file");
+  document.getElementById("convertBtn").disabled = true;
+  document.getElementById("progressSection").style.display = "none";
+  document.getElementById("resultSection").style.display = "none";
+}
+
+window.startConvert = async function() {
+  if (!selectedFile) return;
+  document.getElementById("convertBtn").disabled = true;
+  document.getElementById("progressSection").style.display = "block";
+  document.getElementById("resultSection").style.display = "none";
+
+  try {
+    if (currentMode === "pdf2word") {
+      await pdfToWord(selectedFile);
+    } else {
+      await wordToPdf(selectedFile);
+    }
+  } catch (err) {
+    console.error(err);
+    document.getElementById("progressSection").style.display = "none";
+    document.getElementById("convertBtn").disabled = false;
+    showError(err.message || "转换失败，请重试");
+  }
+};
+
+async function pdfToWord(file) {
+  const bar = document.getElementById("progressBar");
+  const text = document.getElementById("progressText");
+
+  text.textContent = "读取 PDF...";
+  bar.style.width = "10%";
+
+  const arrayBuf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuf }).promise;
+  const totalPages = pdf.numPages;
+
+  // Collect all text and images
+  const pageContents = [];
+  for (let i = 1; i <= totalPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    // Get positioned text items
+    const items = content.items.map(item => ({
+      text: item.str,
+      x: item.transform[4],
+      y: item.transform[5],
+      fontSize: item.transform[0], // approximate
+      yGroup: Math.round(item.transform[5] / 2) * 2 // group nearby Y
+    }));
+
+    // Group by vertical position
+    const groups = {};
+    items.forEach(item => {
+      const key = item.yGroup;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(item);
+    });
+
+    // Sort groups top to bottom, sort items left to right within group
+    const sortedKeys = Object.keys(groups).sort((a, b) => b - a); // PDF Y is bottom-up
+    const sortedGroups = sortedKeys.map(key => {
+      return groups[key].sort((a, b) => a.x - b.x).map(it => it.text).join(" ");
+    });
+
+    pageContents.push(sortedGroups.join("\n"));
+
+    const pct = 10 + Math.round((i / totalPages) * 60);
+    bar.style.width = pct + "%";
+    text.textContent = `提取第 ${i}/${totalPages} 页...`;
+  }
+
+  text.textContent = "生成 DOCX...";
+  bar.style.width = "75%";
+
+  // Generate DOCX with docx.js
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel } = window.docx;
+
+  const children = [];
+  pageContents.forEach((pageText, idx) => {
+    if (idx > 0) {
+      children.push(new Paragraph({ children: [new TextRun({ text: "", break: 1 })] }));
+    }
+    const lines = pageText.split("\n").filter(l => l.trim());
+    lines.forEach(line => {
+      children.push(new Paragraph({
+        children: [new TextRun({ text: line.trim(), size: 22 })],
+        spacing: { after: 80, line: 276 }
+      }));
+    });
+  });
+
+  const doc = new Document({
+    sections: [{
+      properties: {},
+      children: children.length ? children : [new Paragraph({ children: [new TextRun("(无文本内容)")] })]
+    }]
+  });
+
+  const blob = await Packer.toBlob(doc);
+
+  bar.style.width = "100%";
+  text.textContent = "完成";
+  setTimeout(() => {
+    document.getElementById("progressSection").style.display = "none";
+    document.getElementById("convertBtn").disabled = false;
+    showDownload(blob, selectedFile.name.replace(/\.pdf$/i, ".docx"));
+  }, 400);
+}
+
+async function wordToPdf(file) {
+  const bar = document.getElementById("progressBar");
+  const text = document.getElementById("progressText");
+
+  text.textContent = "解析 DOCX...";
+  bar.style.width = "30%";
+
+  const arrayBuf = await file.arrayBuffer();
+  const result = await mammoth.extractRawText({ arrayBuffer: arrayBuf });
+  const content = result.value || "(无内容)";
+
+  text.textContent = "生成 PDF...";
+  bar.style.width = "70%";
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ unit: "pt", format: "a4" });
+  pdf.setFontSize(11);
+
+  const margin = 40;
+  const maxWidth = pdf.internal.pageSize.getWidth() - margin * 2;
+  const lines = pdf.splitTextToSize(content, maxWidth);
+
+  const lineHeight = 14;
+  const maxLinesPerPage = Math.floor((pdf.internal.pageSize.getHeight() - margin * 2) / lineHeight);
+
+  for (let i = 0; i < lines.length; i++) {
+    const pageLine = i % maxLinesPerPage;
+    if (pageLine === 0 && i > 0) pdf.addPage();
+    pdf.text(lines[i], margin, margin + pageLine * lineHeight);
+  }
+
+  const blob = pdf.output("blob");
+
+  bar.style.width = "100%";
+  text.textContent = "完成";
+  setTimeout(() => {
+    document.getElementById("progressSection").style.display = "none";
+    document.getElementById("convertBtn").disabled = false;
+    showDownload(blob, selectedFile.name.replace(/\.docx?$/i, ".pdf"));
+  }, 400);
+}
+
+function showDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const section = document.getElementById("resultSection");
+  section.style.display = "block";
+  section.innerHTML =
+    '<div class="result-success">' +
+    '<div class="result-icon">✅</div>' +
+    '<p>转换完成</p>' +
+    '<p style="color:#94a3b8;font-size:13px;">' + filename + '</p>' +
+    '<a class="btn-download" href="' + url + '" download="' + filename + '">下载文件</a>' +
+    '</div>';
+}
+
+function showError(msg) {
+  const section = document.getElementById("resultSection");
+  section.style.display = "block";
+  section.innerHTML =
+    '<div class="result-error"><div class="result-icon">⚠️</div><p>' + msg + '</p></div>';
+}
+</script>
+</body>
+</html>
